@@ -44,8 +44,12 @@ export function useWebSocket({
       return;
     }
 
+    // SockJS endpoint - backend exposes /ws with SockJS support
+    const sockJsUrl = WS_URL.replace('ws://', 'http://').replace('wss://', 'https://');
+    console.log('[WebSocket] Connecting to:', sockJsUrl);
+
     const client = new Client({
-      webSocketFactory: () => new SockJS(WS_URL.replace('/ws', '/ws-stomp')),
+      webSocketFactory: () => new SockJS(sockJsUrl),
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
