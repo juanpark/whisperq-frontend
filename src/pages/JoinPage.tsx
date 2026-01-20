@@ -80,9 +80,9 @@ export function JoinPage() {
       // For now, simulate login and redirect to admin
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Mock: any login succeeds and goes to admin with DEMO01 session
+      // Mock: any login succeeds and goes to admin with BlPYn3 session
       setIsLoginOpen(false);
-      navigate('/admin/DEMO01');
+      navigate('/admin/BlPYn3');
     } catch {
       setLoginError('로그인에 실패했습니다');
     } finally {
