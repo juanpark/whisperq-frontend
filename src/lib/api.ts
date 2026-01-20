@@ -40,12 +40,15 @@ export async function sendReactionHttp(sessionId: string, type: 'CONFUSED' | 'MO
 }
 
 // Question API
+// Note: Backend QuestionResponse currently only returns id, content, createdAt
+// writerName and sessionId are stored but not exposed in current API
 export interface Question {
   id: number;
-  sessionId: number;
   content: string;
-  writerName: string;
   createdAt: string;
+  // These fields are NOT returned by backend currently, but we keep them optional for future
+  sessionId?: number;
+  writerName?: string;
   answered?: boolean;
 }
 

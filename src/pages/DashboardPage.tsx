@@ -257,8 +257,12 @@ export function DashboardPage() {
                           </p>
                           <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
                             <span>{formatQuestionTime(q.createdAt)}</span>
-                            <span>•</span>
-                            <span>{q.writerName}</span>
+                            {q.writerName && (
+                              <>
+                                <span>•</span>
+                                <span>{q.writerName}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
