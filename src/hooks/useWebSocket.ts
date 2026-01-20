@@ -40,6 +40,18 @@ export function useWebSocket({
     (state) => state.setReactionsFromBackend
   );
 
+  // Store callbacks in refs to avoid reconnection loops when callbacks change
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+  const onErrorRef = useRef(onError);
+
+  // Update refs when callbacks change (without triggering reconnection)
+  useEffect(() => {
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+    onErrorRef.current = onError;
+  }, [onConnect, onDisconnect, onError]);
+
   const connect = useCallback(() => {
     if (clientRef.current?.active) {
       return;
@@ -70,7 +82,7 @@ export function useWebSocket({
         }
         setIsConnected(true);
         setConnectionError(null);
-        onConnect?.();
+        onConnectRef.current?.();
 
         // Subscribe to reaction updates for this session
         const topic = getReactionTopic(sessionId);
@@ -93,13 +105,13 @@ export function useWebSocket({
       onDisconnect: () => {
         console.log('[WebSocket] Disconnected');
         setIsConnected(false);
-        onDisconnect?.();
+        onDisconnectRef.current?.();
       },
 
       onStompError: (frame) => {
         console.error('[WebSocket] STOMP error:', frame.headers.message);
         setConnectionError(frame.headers.message || 'Connection error');
-        onError?.(new Error(frame.headers.message));
+        onErrorRef.current?.(new Error(frame.headers.message));
       },
 
       onWebSocketError: (event) => {
@@ -110,7 +122,7 @@ export function useWebSocket({
           errorTimeoutRef.current = setTimeout(() => {
             if (!clientRef.current?.connected) {
               setConnectionError('WebSocket connection failed');
-              onError?.(new Error('WebSocket connection failed'));
+              onErrorRef.current?.(new Error('WebSocket connection failed'));
             }
             errorTimeoutRef.current = null;
           }, 10000); // 10 second grace period for connection attempts
@@ -120,7 +132,7 @@ export function useWebSocket({
 
     client.activate();
     clientRef.current = client;
-  }, [sessionId, onConnect, onDisconnect, onError, setReactionsFromBackend]);
+  }, [sessionId, setReactionsFromBackend]);
 
   const disconnect = useCallback(() => {
     // Clear any pending error timeout
