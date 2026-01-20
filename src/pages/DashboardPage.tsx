@@ -17,7 +17,7 @@ export function DashboardPage() {
   const [questions, setQuestions] = useState<CheckedQuestion[]>([]);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const savedScrollPosition = useRef<number>(0);
+  const hasFetchedOnce = useRef(false);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(() => {
     // Load checked IDs from localStorage on init
     const stored = localStorage.getItem(`whisperq_checked_questions_${sessionId}`);
@@ -42,46 +42,70 @@ export function DashboardPage() {
   // Save scroll position to localStorage when it changes
   const handleScroll = useCallback(() => {
     if (scrollContainerRef.current) {
-      savedScrollPosition.current = scrollContainerRef.current.scrollTop;
       localStorage.setItem(
         `whisperq_scroll_position_${sessionId}`,
-        String(savedScrollPosition.current)
+        String(scrollContainerRef.current.scrollTop)
       );
     }
   }, [sessionId]);
 
-  // Restore scroll position when modal opens
+  // Restore scroll position after questions render
   useEffect(() => {
-    if (showQuestionsModal && scrollContainerRef.current && !isLoadingQuestions) {
-      const savedScroll = localStorage.getItem(`whisperq_scroll_position_${sessionId}`);
-      if (savedScroll) {
-        scrollContainerRef.current.scrollTop = Number(savedScroll);
-      }
+    if (showQuestionsModal && !isLoadingQuestions && questions.length > 0) {
+      // Use requestAnimationFrame to wait for DOM to render
+      requestAnimationFrame(() => {
+        const savedScroll = localStorage.getItem(`whisperq_scroll_position_${sessionId}`);
+        if (savedScroll && scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = Number(savedScroll);
+        }
+      });
     }
-  }, [showQuestionsModal, isLoadingQuestions, sessionId]);
+  }, [showQuestionsModal, isLoadingQuestions, questions.length, sessionId]);
 
-  // Fetch questions when modal opens - use ref for checkedIds to avoid dependency
+  // Fetch questions - use ref for checkedIds to avoid dependency
   const checkedIdsRef = useRef(checkedIds);
   checkedIdsRef.current = checkedIds;
 
-  const fetchQuestions = useCallback(async () => {
+  // Initial fetch + incremental refresh
+  const fetchQuestions = useCallback(async (forceRefresh = false) => {
+    // If we already have questions and not forcing refresh, only fetch new ones
+    if (hasFetchedOnce.current && !forceRefresh && questions.length > 0) {
+      // Fetch incrementally - only new questions
+      try {
+        const data = await getQuestions();
+        const existingIds = new Set(questions.map(q => q.id));
+        const newQuestions = data.filter(q => !existingIds.has(q.id));
+        if (newQuestions.length > 0) {
+          setQuestions(prev => [
+            ...newQuestions.map(q => ({ ...q, checked: checkedIdsRef.current.has(q.id) })),
+            ...prev
+          ]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch new questions:', error);
+      }
+      return;
+    }
+
+    // Full fetch
     setIsLoadingQuestions(true);
     try {
       const data = await getQuestions();
-      // Add checked property based on persisted checkedIds (use ref to avoid re-fetch on check)
       setQuestions(data.map(q => ({ ...q, checked: checkedIdsRef.current.has(q.id) })));
+      hasFetchedOnce.current = true;
     } catch (error) {
       console.error('Failed to fetch questions:', error);
     } finally {
       setIsLoadingQuestions(false);
     }
-  }, []);
+  }, [questions]);
 
+  // Fetch on modal open - incremental if already fetched once
   useEffect(() => {
     if (showQuestionsModal) {
-      fetchQuestions();
+      fetchQuestions(false);
     }
-  }, [showQuestionsModal, fetchQuestions]);
+  }, [showQuestionsModal]);
 
   const handleToggleQuestion = (id: number) => {
     // Update local state
@@ -233,7 +257,7 @@ export function DashboardPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={fetchQuestions}
+                  onClick={() => fetchQuestions(true)}
                   className="text-gray-400 hover:text-white"
                   disabled={isLoadingQuestions}
                 >
