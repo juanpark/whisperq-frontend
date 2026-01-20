@@ -3,12 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogContent,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 export function JoinPage() {
   const navigate = useNavigate();
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const handleCodeChange = (index: number, value: string) => {
     // Allow only alphanumeric characters (letters and numbers)
@@ -52,6 +64,35 @@ export function JoinPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+      setLoginError('이메일과 비밀번호를 입력해주세요');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setLoginError(null);
+
+    try {
+      // TODO: Call actual login API
+      // For now, simulate login and redirect to admin
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Mock: any login succeeds and goes to admin with DEMO01 session
+      setIsLoginOpen(false);
+      navigate('/admin/DEMO01');
+    } catch {
+      setLoginError('로그인에 실패했습니다');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleSignUp = () => {
+    // TODO: Implement sign up page
+    alert('회원가입 기능은 준비 중입니다');
   };
 
   const fullCode = code.join('');
@@ -122,40 +163,81 @@ export function JoinPage() {
             {isLoading ? '확인 중...' : '참여하기'}
           </Button>
 
-          {/* Demo Mode */}
+          {/* Auth Links */}
           <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-center text-muted-foreground mb-3">
-              데모 모드 (개발용)
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => navigate('/s/DEMO01')}
+            <div className="flex justify-center gap-4 text-sm">
+              <button
+                onClick={handleSignUp}
+                className="text-muted-foreground hover:text-foreground underline"
               >
-                청중 화면
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => navigate('/dashboard/DEMO01')}
+                회원가입
+              </button>
+              <span className="text-muted-foreground">|</span>
+              <button
+                onClick={() => setIsLoginOpen(true)}
+                className="text-muted-foreground hover:text-foreground underline"
               >
-                진행자 대시보드
-              </Button>
+                로그인
+              </button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full mt-2"
-              onClick={() => navigate('/analysis/DEMO01')}
-            >
-              분석 화면
-            </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Login Modal */}
+      <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
+        <DialogClose onClose={() => setIsLoginOpen(false)} />
+        <DialogHeader>
+          <DialogTitle>로그인</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-muted-foreground">이메일</label>
+              <Input
+                type="email"
+                placeholder="이메일을 입력하세요"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">비밀번호</label>
+              <Input
+                type="password"
+                placeholder="비밀번호를 입력하세요"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                className="mt-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+            {loginError && (
+              <p className="text-sm text-destructive">{loginError}</p>
+            )}
+            <Button
+              onClick={handleLogin}
+              disabled={isLoggingIn}
+              className="w-full"
+            >
+              {isLoggingIn ? '로그인 중...' : '로그인'}
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              계정이 없으신가요?{' '}
+              <button
+                onClick={() => {
+                  setIsLoginOpen(false);
+                  handleSignUp();
+                }}
+                className="underline hover:text-foreground"
+              >
+                회원가입
+              </button>
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

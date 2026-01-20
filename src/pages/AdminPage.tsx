@@ -5,29 +5,16 @@ import { Button } from '@/components/ui/button';
 import { useReactionStore } from '@/stores/reactionStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
-interface SessionStats {
-  totalConfused: number;
-  totalMore: number;
-  peakConfused: number;
-  peakMore: number;
-  questionCount: number;
-  duration: string;
-}
-
 export function AdminPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { recentReactions } = useReactionStore();
-  const [syncTime, setSyncTime] = useState<Date | null>(null);
-  const [sessionStartTime] = useState<Date>(new Date());
-  const [stats, setStats] = useState<SessionStats>({
-    totalConfused: 0,
-    totalMore: 0,
-    peakConfused: 0,
-    peakMore: 0,
-    questionCount: 0,
-    duration: '00:00:00',
-  });
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [sessionEndTime, setSessionEndTime] = useState<Date | null>(null);
+  const [duration, setDuration] = useState<string>('00:00:00');
+  const [peakConfused, setPeakConfused] = useState(0);
+  const [peakMore, setPeakMore] = useState(0);
   const [isEndingSession, setIsEndingSession] = useState(false);
 
   // Connect to WebSocket for real-time updates
@@ -37,58 +24,58 @@ export function AdminPage() {
     onError: (err) => console.error('Admin WebSocket error:', err),
   });
 
-  // Update stats when reactions change
+  // Track peak values
   useEffect(() => {
-    setStats(prev => ({
-      ...prev,
-      totalConfused: prev.totalConfused + recentReactions.confused,
-      totalMore: prev.totalMore + recentReactions.more,
-      peakConfused: Math.max(prev.peakConfused, recentReactions.confused),
-      peakMore: Math.max(prev.peakMore, recentReactions.more),
-    }));
+    setPeakConfused(prev => Math.max(prev, recentReactions.confused));
+    setPeakMore(prev => Math.max(prev, recentReactions.more));
   }, [recentReactions.confused, recentReactions.more]);
 
-  // Update duration timer
+  // Update current time every second
   useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update duration when session is running
+  useEffect(() => {
+    if (!sessionStartTime || sessionEndTime) return;
+
     const interval = setInterval(() => {
       const now = new Date();
       const diff = now.getTime() - sessionStartTime.getTime();
       const hours = Math.floor(diff / 3600000);
       const minutes = Math.floor((diff % 3600000) / 60000);
       const seconds = Math.floor((diff % 60000) / 1000);
-      setStats(prev => ({
-        ...prev,
-        duration: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-      }));
+      setDuration(
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [sessionStartTime]);
+  }, [sessionStartTime, sessionEndTime]);
 
-  const handleSyncTimestamp = () => {
-    const now = new Date();
-    setSyncTime(now);
-    // TODO: Send sync timestamp to backend
-    console.log('Sync timestamp:', now.toISOString());
+  const handleStartSession = () => {
+    setSessionStartTime(new Date());
+    setSessionEndTime(null);
+    setDuration('00:00:00');
+    setPeakConfused(0);
+    setPeakMore(0);
   };
 
-  const handleEndSession = async () => {
-    if (!confirm('세션을 종료하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+  const handleEndSession = () => {
+    if (!sessionStartTime) return;
+    if (!confirm('세션을 종료하시겠습니까?')) {
       return;
     }
+    setSessionEndTime(new Date());
+    // TODO: Call backend API to end session
+    console.log('Session ended:', sessionId);
+  };
 
-    setIsEndingSession(true);
-    try {
-      // TODO: Call backend API to end session
-      console.log('Ending session:', sessionId);
-      // Navigate to report view after ending session
-      navigate(`/report/${sessionId}`);
-    } catch (error) {
-      console.error('Failed to end session:', error);
-      alert('세션 종료에 실패했습니다.');
-    } finally {
-      setIsEndingSession(false);
-    }
+  const handleViewReport = () => {
+    navigate(`/report/${sessionId}`);
   };
 
   const formatTime = (date: Date) => {
@@ -98,6 +85,8 @@ export function AdminPage() {
       second: '2-digit',
     });
   };
+
+  const isSessionRunning = sessionStartTime && !sessionEndTime;
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -129,63 +118,81 @@ export function AdminPage() {
           <p className="text-xs text-gray-400 mt-1">현재 30초간</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-gray-500 mb-1">📊 총 혼란</p>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalConfused}</p>
-          <p className="text-xs text-gray-400 mt-1">피크: {stats.peakConfused}</p>
+          <p className="text-sm text-gray-500 mb-1">📊 피크 혼란</p>
+          <p className="text-3xl font-bold text-gray-800">{peakConfused}</p>
+          <p className="text-xs text-gray-400 mt-1">세션 중 최고</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-gray-500 mb-1">📈 총 관심</p>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalMore}</p>
-          <p className="text-xs text-gray-400 mt-1">피크: {stats.peakMore}</p>
+          <p className="text-sm text-gray-500 mb-1">📈 피크 관심</p>
+          <p className="text-3xl font-bold text-gray-800">{peakMore}</p>
+          <p className="text-xs text-gray-400 mt-1">세션 중 최고</p>
         </Card>
       </div>
 
       {/* Session Info */}
       <Card className="p-6 mb-8">
         <h2 className="text-lg font-semibold mb-4">세션 정보</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-sm text-gray-500">진행 시간</p>
-            <p className="text-xl font-mono font-bold">{stats.duration}</p>
+            <p className="text-sm text-gray-500">현재 시간</p>
+            <p className="text-xl font-mono font-bold">{formatTime(currentTime)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-500">시작 시간</p>
-            <p className="text-lg">{formatTime(sessionStartTime)}</p>
+            <p className="text-lg">{sessionStartTime ? formatTime(sessionStartTime) : '-'}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">마지막 싱크</p>
-            <p className="text-lg">{syncTime ? formatTime(syncTime) : '-'}</p>
+            <p className="text-sm text-gray-500">종료 시간</p>
+            <p className="text-lg">{sessionEndTime ? formatTime(sessionEndTime) : '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">진행 시간</p>
+            <p className="text-xl font-mono font-bold">{duration}</p>
           </div>
         </div>
       </Card>
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Sync Timestamp Button */}
-        <Button
-          onClick={handleSyncTimestamp}
-          variant="outline"
-          className="flex-1 h-16 text-lg"
-        >
-          ⏱️ 타임스탬프 동기화
-        </Button>
+        {/* Start Session Button */}
+        {!isSessionRunning && !sessionEndTime && (
+          <Button
+            onClick={handleStartSession}
+            variant="default"
+            className="flex-1 h-16 text-lg bg-green-600 hover:bg-green-700"
+          >
+            ▶️ 세션 시작
+          </Button>
+        )}
 
         {/* End Session Button */}
-        <Button
-          onClick={handleEndSession}
-          variant="destructive"
-          disabled={isEndingSession}
-          className="flex-1 h-16 text-lg"
-        >
-          {isEndingSession ? '종료 중...' : '🛑 세션 종료'}
-        </Button>
+        {isSessionRunning && (
+          <Button
+            onClick={handleEndSession}
+            variant="destructive"
+            className="flex-1 h-16 text-lg"
+          >
+            🛑 세션 종료
+          </Button>
+        )}
+
+        {/* View Report Button (after session ended) */}
+        {sessionEndTime && (
+          <Button
+            onClick={handleViewReport}
+            variant="default"
+            className="flex-1 h-16 text-lg"
+          >
+            📊 리포트 보기
+          </Button>
+        )}
       </div>
 
       {/* Quick Links */}
       <div className="mt-8 flex gap-4">
         <Button
           variant="ghost"
-          onClick={() => navigate(`/dashboard/${sessionId}`)}
+          onClick={() => window.open(`/dashboard/${sessionId}`, '_blank')}
           className="text-gray-600"
         >
           📺 발표자 화면 보기
