@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ReactionButton } from "@/components/ReactionButton";
 import type { ReactionType } from "@/types";
-import { sendReactionHttp, getReactionDestination } from "@/lib/api";
+import { sendReactionHttp, getReactionDestination, createQuestion } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface SentQuestion {
@@ -167,7 +167,20 @@ export function AudiencePage() {
 
 		setIsSubmitting(true);
 		try {
-			// TODO: Send question to API when backend implements it
+			// Send question to backend API
+			await createQuestion(sessionCode || "", question.trim());
+
+			// Add to local list for immediate feedback
+			const newQuestion: SentQuestion = {
+				id: Date.now().toString(),
+				text: question.trim(),
+				timestamp: Date.now(),
+			};
+			setSentQuestions((prev) => [newQuestion, ...prev]);
+			setQuestion("");
+		} catch (error) {
+			console.error("Failed to send question:", error);
+			// Still add locally for demo/offline mode
 			const newQuestion: SentQuestion = {
 				id: Date.now().toString(),
 				text: question.trim(),

@@ -39,6 +39,38 @@ export async function sendReactionHttp(sessionId: string, type: 'CONFUSED' | 'MO
   return response.json();
 }
 
+// Question API
+export interface Question {
+  id: number;
+  sessionId: number;
+  content: string;
+  writerName: string;
+  createdAt: string;
+  answered?: boolean;
+}
+
+export async function createQuestion(sessionId: string, text: string, guestName?: string, userId?: number) {
+  const response = await fetch(`${API_BASE_URL}/api/questions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ sessionId, text, guestName, userId }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create question');
+  }
+  return response.json();
+}
+
+export async function getQuestions(): Promise<Question[]> {
+  const response = await fetch(`${API_BASE_URL}/api/questions`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch questions');
+  }
+  return response.json();
+}
+
 // WebSocket Configuration
 export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws';
 
