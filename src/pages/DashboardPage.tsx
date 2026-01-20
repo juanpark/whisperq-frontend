@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useReactionStore } from '@/stores/reactionStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ export function DashboardPage() {
   const [showQuestionsModal, setShowQuestionsModal] = useState(false);
   const [questions, setQuestions] = useState<CheckedQuestion[]>([]);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollPosition = useRef<number>(0);
   const [checkedIds, setCheckedIds] = useState<Set<number>>(() => {
     // Load checked IDs from localStorage on init
     const stored = localStorage.getItem(`whisperq_checked_questions_${sessionId}`);
@@ -37,19 +39,43 @@ export function DashboardPage() {
     );
   }, [checkedIds, sessionId]);
 
-  // Fetch questions when modal opens
+  // Save scroll position to localStorage when it changes
+  const handleScroll = useCallback(() => {
+    if (scrollContainerRef.current) {
+      savedScrollPosition.current = scrollContainerRef.current.scrollTop;
+      localStorage.setItem(
+        `whisperq_scroll_position_${sessionId}`,
+        String(savedScrollPosition.current)
+      );
+    }
+  }, [sessionId]);
+
+  // Restore scroll position when modal opens
+  useEffect(() => {
+    if (showQuestionsModal && scrollContainerRef.current && !isLoadingQuestions) {
+      const savedScroll = localStorage.getItem(`whisperq_scroll_position_${sessionId}`);
+      if (savedScroll) {
+        scrollContainerRef.current.scrollTop = Number(savedScroll);
+      }
+    }
+  }, [showQuestionsModal, isLoadingQuestions, sessionId]);
+
+  // Fetch questions when modal opens - use ref for checkedIds to avoid dependency
+  const checkedIdsRef = useRef(checkedIds);
+  checkedIdsRef.current = checkedIds;
+
   const fetchQuestions = useCallback(async () => {
     setIsLoadingQuestions(true);
     try {
       const data = await getQuestions();
-      // Add checked property based on persisted checkedIds
-      setQuestions(data.map(q => ({ ...q, checked: checkedIds.has(q.id) })));
+      // Add checked property based on persisted checkedIds (use ref to avoid re-fetch on check)
+      setQuestions(data.map(q => ({ ...q, checked: checkedIdsRef.current.has(q.id) })));
     } catch (error) {
       console.error('Failed to fetch questions:', error);
     } finally {
       setIsLoadingQuestions(false);
     }
-  }, [checkedIds]);
+  }, []);
 
   useEffect(() => {
     if (showQuestionsModal) {
@@ -223,7 +249,11 @@ export function DashboardPage() {
             </div>
 
             {/* Modal Content - Scrollable */}
-            <div className="overflow-y-auto max-h-[60vh] p-4">
+            <div
+              ref={scrollContainerRef}
+              onScroll={handleScroll}
+              className="overflow-y-auto max-h-[60vh] p-4"
+            >
               {isLoadingQuestions ? (
                 <div className="text-center text-gray-400 py-8">
                   질문을 불러오는 중...
