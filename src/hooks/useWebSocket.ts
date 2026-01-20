@@ -33,6 +33,7 @@ export function useWebSocket({
   onError,
 }: UseWebSocketOptions) {
   const clientRef = useRef<Client | null>(null);
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const setReactionsFromBackend = useReactionStore(
@@ -42,6 +43,12 @@ export function useWebSocket({
   const connect = useCallback(() => {
     if (clientRef.current?.active) {
       return;
+    }
+
+    // Clear any pending error timeout
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
     }
 
     // SockJS endpoint - backend exposes /ws with SockJS support
@@ -56,6 +63,11 @@ export function useWebSocket({
 
       onConnect: () => {
         console.log('[WebSocket] Connected');
+        // Clear any pending error timeout since we connected successfully
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+          errorTimeoutRef.current = null;
+        }
         setIsConnected(true);
         setConnectionError(null);
         onConnect?.();
@@ -92,8 +104,17 @@ export function useWebSocket({
 
       onWebSocketError: (event) => {
         console.error('[WebSocket] WebSocket error:', event);
-        setConnectionError('WebSocket connection failed');
-        onError?.(new Error('WebSocket connection failed'));
+        // Use a delayed error to allow SockJS to try fallback transports
+        // Only show error if connection doesn't succeed within 10 seconds
+        if (!errorTimeoutRef.current && !clientRef.current?.connected) {
+          errorTimeoutRef.current = setTimeout(() => {
+            if (!clientRef.current?.connected) {
+              setConnectionError('WebSocket connection failed');
+              onError?.(new Error('WebSocket connection failed'));
+            }
+            errorTimeoutRef.current = null;
+          }, 10000); // 10 second grace period for connection attempts
+        }
       },
     });
 
@@ -102,6 +123,11 @@ export function useWebSocket({
   }, [sessionId, onConnect, onDisconnect, onError, setReactionsFromBackend]);
 
   const disconnect = useCallback(() => {
+    // Clear any pending error timeout
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
     if (clientRef.current) {
       clientRef.current.deactivate();
       clientRef.current = null;
