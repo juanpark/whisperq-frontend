@@ -16,6 +16,11 @@ export function DashboardPage() {
   const [showQuestionsModal, setShowQuestionsModal] = useState(false);
   const [questions, setQuestions] = useState<CheckedQuestion[]>([]);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(() => {
+    // Load checked IDs from localStorage on init
+    const stored = localStorage.getItem(`whisperq_checked_questions_${sessionId}`);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
 
   // Connect to WebSocket for real-time updates
   const { isConnected, connectionError } = useWebSocket({
@@ -24,19 +29,27 @@ export function DashboardPage() {
     onError: (err) => console.error('Dashboard WebSocket error:', err),
   });
 
+  // Save checked IDs to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(
+      `whisperq_checked_questions_${sessionId}`,
+      JSON.stringify([...checkedIds])
+    );
+  }, [checkedIds, sessionId]);
+
   // Fetch questions when modal opens
   const fetchQuestions = useCallback(async () => {
     setIsLoadingQuestions(true);
     try {
       const data = await getQuestions();
-      // Add checked property to each question
-      setQuestions(data.map(q => ({ ...q, checked: false })));
+      // Add checked property based on persisted checkedIds
+      setQuestions(data.map(q => ({ ...q, checked: checkedIds.has(q.id) })));
     } catch (error) {
       console.error('Failed to fetch questions:', error);
     } finally {
       setIsLoadingQuestions(false);
     }
-  }, []);
+  }, [checkedIds]);
 
   useEffect(() => {
     if (showQuestionsModal) {
@@ -45,9 +58,20 @@ export function DashboardPage() {
   }, [showQuestionsModal, fetchQuestions]);
 
   const handleToggleQuestion = (id: number) => {
+    // Update local state
     setQuestions(prev =>
       prev.map(q => (q.id === id ? { ...q, checked: !q.checked } : q))
     );
+    // Update persisted checkedIds
+    setCheckedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
   };
 
   const formatQuestionTime = (dateStr: string) => {

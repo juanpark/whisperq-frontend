@@ -274,6 +274,13 @@ export function AudiencePage() {
 					</div>
 				)}
 
+				{/* Guidance Text */}
+				<p className="text-sm text-muted-foreground text-center max-w-xs leading-relaxed">
+					버튼 하나로 진행자와 소통하세요.
+					<br />
+					연타할수록, 여러명이 누를수록 신호가 강하게 전달됩니다.
+				</p>
+
 				{/* Reaction Buttons - Per spec labels */}
 				<div className="flex gap-6">
 					<ReactionButton
@@ -332,7 +339,7 @@ export function AudiencePage() {
 					<form onSubmit={handleSubmitQuestion} className="flex gap-2">
 						<Input
 							type="text"
-							placeholder="질문을 입력하세요..."
+							placeholder="질문은 익명으로 자유롭게"
 							value={question}
 							onChange={(e) => setQuestion(e.target.value)}
 							className="flex-1"
