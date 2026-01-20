@@ -15,7 +15,6 @@ export function AdminPage() {
   const [duration, setDuration] = useState<string>('00:00:00');
   const [peakConfused, setPeakConfused] = useState(0);
   const [peakMore, setPeakMore] = useState(0);
-  const [isEndingSession, setIsEndingSession] = useState(false);
 
   // Connect to WebSocket for real-time updates
   const { isConnected, connectionError } = useWebSocket({
