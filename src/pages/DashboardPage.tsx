@@ -77,8 +77,8 @@ export function DashboardPage() {
         const newQuestions = data.filter(q => !existingIds.has(q.id));
         if (newQuestions.length > 0) {
           setQuestions(prev => [
-            ...newQuestions.map(q => ({ ...q, checked: checkedIdsRef.current.has(q.id) })),
-            ...prev
+            ...prev,
+            ...newQuestions.map(q => ({ ...q, checked: checkedIdsRef.current.has(q.id) }))
           ]);
         }
       } catch (error) {
